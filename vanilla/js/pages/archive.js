@@ -1,0 +1,96 @@
+import { subscribeArchive } from "../data.js";
+import { restoreAccount, restoreGateCard, restoreUser, restoreVehicle } from "../services.js";
+import { badge, layout, skeleton, table, toast } from "../ui.js";
+import { h, isStaff, mount, vehiclesOf } from "../utils.js";
+
+/** A "Restore" button that shows progress; on success the row disappears via the live subscription. */
+function restoreButton(action, successMessage) {
+  const button = h("button", { class: "btn sm pri", onclick: async () => {
+    button.disabled = true;
+    button.textContent = "Restoring…";
+    try {
+      await action();
+      toast(successMessage);
+    } catch (error) {
+      toast(error.message || "Could not restore this record", "err");
+      button.disabled = false;
+      button.textContent = "Restore";
+    }
+  } }, "Restore");
+  return button;
+}
+
+const archivedOn = { header: "Archived on", render: (r) => r.archived_at || "—" };
+
+const TABS = [
+  {
+    key: "users", label: "Users", empty: "No archived users.",
+    columns: [
+      { header: "Name", render: (u) => u.name || "N/A" },
+      { header: "ID", render: (u) => u.id },
+      { header: "Type", render: (u) => badge(isStaff(u.id, u) ? "Staff" : "Student") },
+      { header: "Course / Dept", render: (u) => u.course || u.department || "N/A" },
+      { header: "Vehicles", render: (u) => vehiclesOf(u).length },
+      archivedOn,
+      { header: "", render: ({ id, ...record }) => restoreButton(() => restoreUser(id, record), `Restored ${record.name || id}`) },
+    ],
+  },
+  {
+    key: "vehicles", label: "Vehicles", empty: "No archived vehicles.",
+    columns: [
+      { header: "Vehicle ID", render: (v) => v.vehicleId },
+      { header: "Owner", render: (v) => h("a", { href: `#/users/${encodeURIComponent(v.studentId)}` }, v.studentId) },
+      { header: "Type", render: (v) => v.type || "N/A" },
+      { header: "Vehicle", render: (v) => `${v.brand} ${v.model}`.trim() || "N/A" },
+      { header: "Plate", render: (v) => v.plate_number || "N/A" },
+      archivedOn,
+      { header: "", render: ({ id, studentId, vehicleId, ...record }) => restoreButton(() => restoreVehicle(studentId, vehicleId, record), `Restored vehicle ${vehicleId}`) },
+    ],
+  },
+  {
+    key: "cards", label: "Gate cards", empty: "No archived gate cards.",
+    columns: [
+      { header: "Card UID", render: (c) => c.id },
+      { header: "Label", render: (c) => c.label || "—" },
+      { header: "Added", render: (c) => c.created || "—" },
+      archivedOn,
+      { header: "", render: ({ id, ...record }) => restoreButton(() => restoreGateCard(id, record), `Restored card ${id}`) },
+    ],
+  },
+  {
+    key: "accounts", label: "Accounts", empty: "No archived accounts.",
+    columns: [
+      { header: "Email", render: (a) => a.email },
+      { header: "Role", render: (a) => a.role },
+      archivedOn,
+      { header: "", render: ({ id, ...record }) => restoreButton(() => restoreAccount(id, record), `Restored access for ${record.email}`) },
+    ],
+  },
+];
+
+export default function archivePage(app) {
+  let archive = null;
+  let activeTab = "users";
+
+  const tabsSlot = h("div", { class: "seg", role: "tablist" });
+  const tableSlot = h("div", {}, skeleton());
+
+  const { root, body } = layout("Archive");
+  body.append(
+    h("p", { class: "mut" }, "Removed records are kept here. Restoring a user brings back their vehicles as ", h("b", {}, "Not parked"),
+      "; a vehicle can only be restored while its owner is an active user."),
+    h("div", { class: "card" }, tabsSlot, tableSlot));
+  app.replaceChildren(root);
+
+  function draw() {
+    mount(tabsSlot, TABS.map((tab) =>
+      h("button", { role: "tab", "aria-selected": String(tab.key === activeTab), class: `btn${tab.key === activeTab ? " on" : ""}`, onclick: () => { activeTab = tab.key; draw(); } },
+        `${tab.label} (${archive ? archive[tab.key].length : "…"})`)));
+    if (!archive) return;
+    const tab = TABS.find((t) => t.key === activeTab);
+    mount(tableSlot, table(tab.columns, archive[tab.key], tab.empty));
+  }
+
+  draw();
+  return subscribeArchive((next) => { archive = next; draw(); });
+}

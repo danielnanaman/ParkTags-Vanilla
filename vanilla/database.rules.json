@@ -1,0 +1,44 @@
+{
+  "rules": {
+    "roles": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+    "students": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'admin'",
+      "$sid": {
+        "vehicles": {
+          "$vid": {
+            "current_status": {
+              ".write": "auth != null && root.child('roles').child(auth.uid).exists()"
+            }
+          }
+        }
+      }
+    },
+    "access_logs": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('roles').child(auth.uid).exists()"
+    },
+    "settings": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "archived_students": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "archived_vehicles": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "archived_roles": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'admin'"
+    }
+  }
+}
