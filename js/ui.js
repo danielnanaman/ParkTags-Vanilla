@@ -1,16 +1,17 @@
-// Shared UI building blocks: toast, modal, confirm, table, pager, filter bar, page layout, table columns.
-import { HOME, NAV, PAGE_SIZES, TOAST_MS } from "./constants.js";
+
+import { ERROR_TOAST_MS, HOME, NAV, PAGE_SIZES, TOAST_MS } from "./constants.js";
 import { logout, session } from "./auth.js";
-import { h, mount } from "./utils.js";
+import { h, mount, vehicleTypeLabel } from "./utils.js";
 
 /* ---------------- small pieces ---------------- */
 
 export const badge = (text, tone = "") => h("span", { class: `badge ${tone}` }, text);
-export const stat = (label, value) => h("div", { class: "card stat" }, h("span", {}, label), h("b", {}, value));
+export function stat(label, value, { href, sub, go = "View list →" } = {}) {
+  const content = [h("span", {}, label), h("b", {}, value), sub && h("small", { class: "sub" }, sub), href && h("small", { class: "go" }, go)];
+  return href ? h("a", { class: "card stat link", href }, content) : h("div", { class: "card stat" }, content);
+}
 export const chips = (items) => h("div", { class: "chips" }, items.map(([label, value]) => h("span", {}, `${label} `, h("b", {}, value))));
 export const skeleton = () => h("div", {}, [0, 1, 2, 3, 4].map(() => h("div", { class: "skel" })));
-
-/** <label class="field"> with a control and optional hint. Exposes `.hintEl` for live updates. */
 export function field(label, control, hint) {
   const hintEl = h("small", {}, hint || "");
   const node = h("label", { class: "field" }, h("span", {}, label), control, hintEl);
@@ -27,12 +28,11 @@ export const options = (items, placeholder) => [
 export function toast(message, type = "ok") {
   const el = h("div", { class: `toast ${type}` }, message);
   document.getElementById("toasts").append(el);
-  setTimeout(() => el.remove(), TOAST_MS);
+  setTimeout(() => el.remove(), type === "err" ? ERROR_TOAST_MS : TOAST_MS);
 }
 
 /* ---------------- modal / confirm ---------------- */
 
-/** Opens a modal and returns its close() function. */
 export function openModal(title, content) {
   const close = () => {
     removeEventListener("keydown", onKey);
@@ -49,8 +49,6 @@ export function openModal(title, content) {
   document.body.append(overlay);
   return close;
 }
-
-/** Confirm dialog. `run` is awaited; on success `success` is toasted, on failure `failure`. */
 export function confirmAction({ title, confirmLabel, message, run, success, failure }) {
   const close = openModal(title, [
     h("p", {}, message),
@@ -71,20 +69,35 @@ export function confirmAction({ title, confirmLabel, message, run, success, fail
   ]);
 }
 
-/** Wires a <form> to an async action: blocks double-submit, toasts the result, calls onDone on success. */
+function showFormError(form, message) {
+  let box = form.querySelector(".form-error");
+  if (!box) {
+    box = h("div", { class: "form-error", role: "alert" });
+    const anchor = form.querySelector(".mact") || form.querySelector("button.pri");
+    anchor.parentNode.insertBefore(box, anchor);
+  }
+  box.textContent = message;
+  box.hidden = false;
+  box.scrollIntoView?.({ block: "nearest" });
+}
+
 export function handleSubmit(form, action, onDone, busyLabel = "Saving…") {
+  form.addEventListener("input", () => { const box = form.querySelector(".form-error"); if (box) box.hidden = true; });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = form.querySelector("button.pri");
     const label = button.textContent;
     button.disabled = true;
     button.textContent = busyLabel;
+    form.querySelector(".form-error")?.setAttribute("hidden", "");
     try {
       const message = await action(Object.fromEntries(new FormData(form)));
       if (message) toast(message);
       onDone();
     } catch (error) {
-      toast(error.message || "Something went wrong. Please try again.", "err");
+      const message = error.message || "Something went wrong. Please try again.";
+      showFormError(form, message);
+      toast(message, "err");
     } finally {
       button.disabled = false;
       button.textContent = label;
@@ -96,8 +109,6 @@ export const formActions = (onClose, label) =>
   h("div", { class: "mact" }, h("button", { type: "button", class: "btn", onclick: onClose }, "Cancel"), h("button", { class: "btn pri" }, label));
 
 /* ---------------- table & pager ---------------- */
-
-/** columns: [{ header, render(row) -> Node|string }] */
 export function table(columns, rows, emptyText) {
   if (!rows.length) return h("div", { class: "empty" }, emptyText);
   return h("div", { class: "scroll" }, h("table", {},
@@ -105,7 +116,6 @@ export function table(columns, rows, emptyText) {
     h("tbody", {}, rows.map((row) => h("tr", {}, columns.map((c) => h("td", { "data-label": c.header }, c.render(row))))))));
 }
 
-/** Client-side paging. `slice(rows)` returns the current page and redraws the pager. A size of 0 shows everything. */
 export function createPager(onChange, initialSize = 25) {
   let size = initialSize, page = 1, pageCount = 1, total = 0;
   const node = h("div", { class: "pager" });
@@ -134,13 +144,8 @@ export function createPager(onChange, initialSize = 25) {
 
 /* ---------------- filter bar ---------------- */
 
-/**
- * Search box + dropdown/date filters.
- * fields: [{ key, label, type: "select"|"date", options?: [[value, label]] }]
- * Returns { node, state: { query, filters }, setOptions(key, options) }.
- */
-export function filterBar({ placeholder, fields, defaults, onChange }) {
-  const state = { query: "", filters: { ...defaults } };
+export function filterBar({ placeholder, fields, defaults, initial = {}, onChange }) {
+  const state = { query: "", filters: { ...defaults, ...initial } };
   const controls = {};
   const search = h("input", { class: "inp wide", type: "search", placeholder, "aria-label": "Search", oninput: (e) => { state.query = e.target.value; onChange(); } });
 
@@ -150,7 +155,7 @@ export function filterBar({ placeholder, fields, defaults, onChange }) {
       ? h("input", { class: "inp", type: "date" })
       : h("select", { class: "inp" }, options(f.options || []));
     control.addEventListener(isDate ? "input" : "change", (e) => { state.filters[f.key] = e.target.value; onChange(); });
-    control.value = defaults[f.key];
+    control.value = state.filters[f.key];
     controls[f.key] = control;
     return field(f.label, control);
   });
@@ -176,10 +181,11 @@ export function filterBar({ placeholder, fields, defaults, onChange }) {
 }
 
 /* ---------------- page layout ---------------- */
-
-/** Header + title bar. Returns { root, body }: append page content to `body`. */
 export function layout(title, actions = []) {
-  const here = location.hash.slice(1);
+  const home = HOME[session.role];
+  const NAV_ALIAS = { "/parked-users": home, "/vehicles": home, "/parked-vehicles": home };
+  const current = location.hash.slice(1).split("?")[0];
+  const here = NAV_ALIAS[current] || current;
   const nav = (NAV[session.role] || []).map(([to, label]) =>
     h("a", { href: `#${to}`, class: here === to || here.startsWith(`${to}/`) ? "active" : "" }, label));
 
@@ -190,7 +196,6 @@ export function layout(title, actions = []) {
     h("header", { class: "top" }, h("div", { class: "bar" },
       h("a", { href: `#${HOME[session.role]}`, class: "brand" }, h("img", { src: "assets/image.png", alt: "" }), h("b", {}, "STI ParkTags")),
       h("nav", {}, nav),
-      h("span", { class: "who", title: session.user?.email || "" }, session.role),
       h("button", { class: "btn sm out", onclick: logout }, "Log out"))),
     body);
   return { root, body };
@@ -210,12 +215,11 @@ export const activityColumns = [
   {
     header: "Result",
     render: (r) => h("span", {}, badge(r.label, RESULT_TONE[r.label] || ""),
-      r.needs_details && [" ", badge("Needs details", "warn")],
+      r.needs_details && [" ", badge("Pending manual entry", "warn")],
       r.manual && [" ", badge("Manual", "mut")]),
   },
 ];
 
-/** Appends an "Add details" button column for rows still waiting for a guard's input. */
 export const withAddDetails = (columns, onAddDetails) => [
   ...columns,
   { header: "", render: (r) => r.needs_details ? h("button", { class: "btn sm pri", onclick: () => onAddDetails(r) }, "Add details") : null },
@@ -230,4 +234,15 @@ export const userColumns = [
   { header: "Vehicles", render: (u) => (u.vehicleCount ? `${u.vehicleCount} vehicle${u.vehicleCount > 1 ? "s" : ""}` : "None") },
   { header: "Status", render: (u) => !u.vehicleCount ? badge("No vehicle", "mut") : badge(u.parked ? "Parked" : "Not parked", u.parked ? "ok" : "mut") },
   { header: "", render: (u) => h("a", { class: "btn sm", href: `#/users/${encodeURIComponent(u.id)}` }, "View") },
+];
+
+export const vehicleColumns = [
+  { header: "Vehicle ID", render: (v) => v.vehicleId },
+  { header: "Owner", render: (v) => (session.role === "admin" ? h("a", { href: `#/users/${encodeURIComponent(v.studentId)}` }, v.ownerName) : v.ownerName) },
+  { header: "Type", render: (v) => vehicleTypeLabel(v.type) },
+  { header: "Vehicle", render: (v) => `${v.brand || ""} ${v.model || ""}`.trim() || "N/A" },
+  { header: "Plate", render: (v) => v.plate_number || "N/A" },
+  { header: "Color", render: (v) => v.color || "N/A" },
+  { header: "Expires", render: (v) => v.registration_expiry || "N/A" },
+  { header: "Status", render: (v) => badge(v.parked ? "Parked" : "Not parked", v.parked ? "ok" : "mut") },
 ];

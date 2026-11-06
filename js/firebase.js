@@ -1,5 +1,4 @@
-// Firebase is loaded straight from Google's CDN as ES modules (no bundler needed).
-// To change SDK version, edit FIREBASE_VERSION.
+
 const FIREBASE_VERSION = "12.19.0";
 const CDN = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
 

@@ -5,15 +5,17 @@ import { defaultActivityFilters, filterActivities, h, mount, today } from "../ut
 
 const FILTER_FIELDS = [
   { key: "kind", label: "User", type: "select", options: [["all", "All users"], ["student", "Students"], ["staff", "Staff"], ["visitor", "Visitors"]] },
-  { key: "result", label: "Result", type: "select", options: [["granted", "Entries and exits"], ["ENTRANCE", "Entries only"], ["EXIT", "Exits only"], ["PENDING", "Needs details"], ["DENIED", "Denied only"], ["all", "Everything"]] },
+  { key: "result", label: "Result", type: "select", options: [["granted", "Entries and exits"], ["ENTRANCE", "Entries only"], ["EXIT", "Exits only"], ["PENDING", "Pending manual entries"], ["DENIED", "Denied only"], ["all", "Everything"]] },
   { key: "source", label: "Source", type: "select", options: [["all", "All sources"], ["manual", "Manual entries"], ["scan", "Gate scans"]] },
-  { key: "vehicle", label: "Vehicle", type: "select", options: [["all", "All vehicles"], ["car", "Car"], ["motorcycle", "Motorcycle"], ["Other", "Other"]] },
+  { key: "vehicle", label: "Vehicle", type: "select", options: [["all", "All vehicles"], ["car", "Car"], ["motorcycle", "Motorcycle"], ["bike", "Bike"], ["ebike", "E-bike"], ["Other", "Other"]] },
   { key: "from", label: "From", type: "date" },
   { key: "to", label: "To", type: "date" },
 ];
 
-export default function activitiesPage(app) {
+export default function activitiesPage(app, params = {}) {
   let data = null;
+  const isToday = params.query?.range === "today";
+  const initial = isToday ? { result: "all", from: today(), to: today() } : {};
   const openEntry = (pendingLog = null) => data && openActivityModal({ students: data.students, pendingLog });
 
   const columns = withAddDetails([
@@ -22,12 +24,12 @@ export default function activitiesPage(app) {
     { header: "Remarks", render: (r) => r.remarks || "—" },
   ], openEntry);
 
-  const filters = filterBar({ placeholder: "Search name, ID or plate…", fields: FILTER_FIELDS, defaults: defaultActivityFilters, onChange: () => draw() });
+  const filters = filterBar({ placeholder: "Search name, ID or plate…", fields: FILTER_FIELDS, defaults: defaultActivityFilters, initial, onChange: () => draw() });
   const pager = createPager(() => draw());
   const chipsSlot = h("div");
   const tableSlot = h("div", {}, skeleton());
 
-  const { root, body } = layout("Parking activity", [h("button", { class: "btn pri", onclick: () => openEntry() }, "+ Manual entry")]);
+  const { root, body } = layout(isToday ? "Today’s activity" : "Parking activity", [h("button", { class: "btn pri", onclick: () => openEntry() }, "+ Manual entry")]);
   body.append(h("div", { class: "card" }, filters.node, chipsSlot, tableSlot, pager.node));
   app.replaceChildren(root);
 

@@ -37,7 +37,7 @@ export default function cardsPage(app) {
 
   const { root, body } = layout("Gate cards");
   body.append(
-    h("p", { class: "mut" }, "A registered card opens the gate with no registration, expiry or parked-status checks. Each tap is logged and flagged ", h("b", {}, "Needs details"), " so the guard can add who entered."),
+    h("p", { class: "mut" }, "A registered card opens the gate with no registration, expiry or parked-status checks. Each tap is logged and flagged ", h("b", {}, "pending manual entry"), " so the guard can add who entered."),
     form, h("div", { class: "card" }, tableSlot));
   app.replaceChildren(root);
 

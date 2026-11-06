@@ -14,7 +14,7 @@ export default function loginPage(app) {
     button.textContent = "Signing in…";
     error.textContent = "";
     try {
-      await signIn(email.value, password.value); // the router redirects once auth state changes
+      await signIn(email.value, password.value); 
     } catch {
       error.textContent = "Incorrect email or password.";
       button.disabled = false;

@@ -1,4 +1,4 @@
-// Live reads from Realtime Database. Each subscribe* function returns an unsubscribe function.
+
 import { db, onValue, ref } from "./firebase.js";
 import { DB } from "./constants.js";
 import { buildActivityRows, buildUserRows, toRows } from "./utils.js";
@@ -6,7 +6,6 @@ import { buildActivityRows, buildUserRows, toRows } from "./utils.js";
 export const subscribe = (path, callback) =>
   onValue(ref(db, path), (snapshot) => callback(snapshot.val()), () => callback(null));
 
-/** Subscribes to several paths and calls back once all have loaded, then on every change. */
 function subscribeMany(paths, callback) {
   const keys = Object.keys(paths);
   const values = {};
@@ -20,7 +19,6 @@ function subscribeMany(paths, callback) {
   return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
 }
 
-/** Access logs joined with students -> { activities, students, users } */
 export const subscribeActivities = (callback) =>
   subscribeMany({ logs: DB.accessLogs, students: DB.students }, ({ logs, students }) => {
     const studentMap = students || {};
@@ -35,7 +33,6 @@ export const subscribeUsers = (callback) =>
 
 const newestFirst = (a, b) => (b.archived_at || "").localeCompare(a.archived_at || "");
 
-/** Every archive collection as sorted table rows. */
 export const subscribeArchive = (callback) =>
   subscribeMany(
     { users: DB.archivedStudents, vehicles: DB.archivedVehicles, cards: DB.archivedManualCards, accounts: DB.archivedRoles },

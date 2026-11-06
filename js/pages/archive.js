@@ -1,9 +1,8 @@
 import { subscribeArchive } from "../data.js";
 import { restoreAccount, restoreGateCard, restoreUser, restoreVehicle } from "../services.js";
 import { badge, layout, skeleton, table, toast } from "../ui.js";
-import { h, isStaff, mount, vehiclesOf } from "../utils.js";
+import { h, isStaff, mount, vehicleTypeLabel, vehiclesOf } from "../utils.js";
 
-/** A "Restore" button that shows progress; on success the row disappears via the live subscription. */
 function restoreButton(action, successMessage) {
   const button = h("button", { class: "btn sm pri", onclick: async () => {
     button.disabled = true;
@@ -40,7 +39,7 @@ const TABS = [
     columns: [
       { header: "Vehicle ID", render: (v) => v.vehicleId },
       { header: "Owner", render: (v) => h("a", { href: `#/users/${encodeURIComponent(v.studentId)}` }, v.studentId) },
-      { header: "Type", render: (v) => v.type || "N/A" },
+      { header: "Type", render: (v) => (v.type ? vehicleTypeLabel(v.type) : "N/A") },
       { header: "Vehicle", render: (v) => `${v.brand} ${v.model}`.trim() || "N/A" },
       { header: "Plate", render: (v) => v.plate_number || "N/A" },
       archivedOn,

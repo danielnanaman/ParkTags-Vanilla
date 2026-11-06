@@ -1,9 +1,9 @@
-import { DB } from "../constants.js";
+import { DB, MAX_VEHICLES_PER_USER } from "../constants.js";
 import { subscribe } from "../data.js";
 import { openEditProfileModal, openVehicleModal } from "../modals.js";
 import { archiveUser, archiveVehicle } from "../services.js";
 import { badge, confirmAction, layout, skeleton } from "../ui.js";
-import { h, initialsOf, isStaff, mount, vehiclesOf } from "../utils.js";
+import { h, initialsOf, isStaff, mount, vehicleTypeLabel, vehiclesOf } from "../utils.js";
 
 const info = (label, value) => h("div", {}, h("b", {}, label), value || "N/A");
 
@@ -16,10 +16,10 @@ function sidebar(id, student) {
     h("p", { class: "mut" }, id),
     badge(isStaff(id, student) ? "Staff" : "Student"),
     h("ul", {},
-      h("li", {}, `📧 ${student.email || "N/A"}`),
-      h("li", {}, `📱 ${student.contact_number || "N/A"}`),
-      h("li", {}, `🎓 ${student.course || student.department || "N/A"}`),
-      student.year_level && h("li", {}, `📚 Year ${student.year_level}`)),
+      h("li", {}, `${student.email || "N/A"}`),
+      h("li", {}, `${student.contact_number || "N/A"}`),
+      h("li", {}, `${student.course || student.department || "N/A"}`),
+      student.year_level && h("li", {}, `Year ${student.year_level}`)),
     h("div", { class: "info" }, info("Vehicles", vehicles.length), info("Parked now", parked)));
 }
 
@@ -35,7 +35,7 @@ function vehicleCard(vehicleId, vehicle, { onEdit, onRemove }) {
   return h("div", { class: "veh" },
     h("div", { class: "vh" }, h("b", {}, vehicleId), badge(parked ? "Parked" : "Not parked", parked ? "ok" : "mut")),
     h("dl", {},
-      h("dt", {}, "Type"), h("dd", {}, vehicle.type || "N/A"),
+      h("dt", {}, "Type"), h("dd", {}, vehicle.type ? vehicleTypeLabel(vehicle.type) : "N/A"),
       h("dt", {}, "Vehicle"), h("dd", {}, `${vehicle.brand} ${vehicle.model}`),
       h("dt", {}, "Plate"), h("dd", {}, vehicle.plate_number || "N/A"),
       h("dt", {}, "Color"), h("dd", {}, vehicle.color || "N/A"),
@@ -92,7 +92,13 @@ export default function profilePage(app, { id }) {
         h("div", {},
           emergencyCard(student.emergency_contact),
           h("section", { class: "card" },
-            h("h2", {}, `Vehicles (${vehicles.length}) `, h("button", { class: "btn sm pri", onclick: () => openVehicleModal({ studentId: id, vehicles: student.vehicles }) }, "+ Add vehicle")),
+            h("h2", {}, `Vehicles (${vehicles.length}/${MAX_VEHICLES_PER_USER}) `,
+              h("button", {
+                class: "btn sm pri",
+                disabled: vehicles.length >= MAX_VEHICLES_PER_USER,
+                title: vehicles.length >= MAX_VEHICLES_PER_USER ? `A user can have at most ${MAX_VEHICLES_PER_USER} vehicles` : "",
+                onclick: () => openVehicleModal({ studentId: id, vehicles: student.vehicles }),
+              }, vehicles.length >= MAX_VEHICLES_PER_USER ? "Limit reached" : "+ Add vehicle")),
             !vehicles.length && h("p", { class: "empty" }, "No vehicles registered."),
             h("div", { class: "vgrid" }, vehicles.map(([vehicleId, vehicle]) => vehicleCard(vehicleId, vehicle, {
               onEdit: () => openVehicleModal({ studentId: id, vehicleId, vehicles: student.vehicles }),
